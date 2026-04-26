@@ -16,7 +16,7 @@ const int UPPER_HUM = 80;
 
 int temp = -1;
 int humidity = -1;
-unsigned long lastDashboard = 0;
+unsigned long lastDashboard = 60000;
 const unsigned long DASH_INTERVAL = 60000; // 60,000 ms = 1 minute
 
 
@@ -36,13 +36,15 @@ void setupBME();
 void checkBME();
 bool tempInRange();
 bool humidityInRange();
+void checkDashboard();
+void printDashboard();
 
 State greenhouse = IDLE;
 
 void setup() {
   Serial.begin(9600);
   while (!Serial);
-  Serial.println(F("BME680 test"));
+  //Serial.println(F("BME680 test"));
 
   if (!bme.begin()) {
     Serial.println("Could not find a valid BME680 sensor, check wiring!");
@@ -54,10 +56,11 @@ void setup() {
 
 void loop() {
   //checkBME();
-  Serial.println("hello world");
+  //Serial.println("hello world");
   switch (greenhouse) {
     case IDLE: 
       checkBME();
+      checkDashboard();
       break;
     case WATERING:
       Serial.println("watering");
@@ -97,13 +100,12 @@ void checkBME() {
     greenhouse = WARNING_HUM;
   }
 
-  Serial.println(humidity);
   delay(3000);
 }
 
 bool tempInRange() {
   if ((temp >= LOWER_TEMP) && (temp <= UPPER_TEMP)) {
-    Serial.println("temp in range");
+    //Serial.println("temp in range");
     return true;
   } else {
     return false;
@@ -111,19 +113,20 @@ bool tempInRange() {
 }
 
 bool humidityInRange() {
-  if ((temp >= LOWER_HUM) && (temp <= UPPER_HUM)) {
-    Serial.println("humidity in range");
+  if ((humidity >= LOWER_HUM) && (humidity <= UPPER_HUM)) {
+    //Serial.println("humidity in range");
     return true;
   } else {
     return false;
   }
+}
+
+void checkDashboard() {
   if (millis() - lastDashboard >= DASH_INTERVAL) {
     printDashboard();
     lastDashboard = millis();
+  }
 }
-
-
-
 
 void setupBME() {
   // Set up oversampling and filter initialization
@@ -145,13 +148,14 @@ void printDashboard() {
   float gas = bme.gas_resistance / 1000.0;
 
   // update state based on temp
-  if (!tempInRange(temp)) {
+  if (!tempInRange()) {
     greenhouse = WARNING_TEMP;
   } else {
     greenhouse = IDLE;
   }
+  
 
-  Serial.println("----- GREENHOUSE STATUS -----");
+  Serial.println("\n----- GREENHOUSE STATUS -----");
 
   Serial.print("Temp: ");
   Serial.print(temp);
