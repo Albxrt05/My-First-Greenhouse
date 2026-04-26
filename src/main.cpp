@@ -2,6 +2,7 @@
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
+#include "Adafruit_seesaw.h"
 
 #define BME_SCK 13
 #define BME_MISO 12
@@ -11,6 +12,15 @@
 #define SEALEVELPRESSURE_HPA (1013.25)
 const int LOWER_TEMP = 21;
 const int UPPER_TEMP = 29;
+
+Adafruit_seesaw soilSensor; // soil moisture sensor object
+
+const int WINDOW_SIZE = 4; // size of moving average window
+float moistureReadings[WINDOW_SIZE];
+
+int currentIndex = 0;
+float avgMoisture = 0;
+bool soilIsWet = false;
 
 
 Adafruit_BME680 bme; // I2C
@@ -40,6 +50,17 @@ void setup() {
   }
 
   setupBME(); 
+
+  Serial.begin(115200);
+
+  // initialize sensor
+  if (!soilSensor.begin(0x36)) {
+    Serial.println("Could not find seesaw sensor. Check wiring.");
+    while (1);
+  }
+
+  Serial.print("Seesaw initialized. Version: ");
+  Serial.println(soilSensor.getVersion(), HEX);
 }
 
 void loop() {
@@ -57,6 +78,48 @@ void loop() {
     default:
       Serial.println("default case");
   }
+
+  float temperature = soilSensor.getTemp();
+  uint16_t moisture = soilSensor.touchRead(0);
+
+  // store reading in array (circular buffer)
+  if (currentIndex >= WINDOW_SIZE) {
+    currentIndex = 0;
+  }
+
+  moistureReadings[currentIndex] = moisture;
+  currentIndex++;
+
+  // compute average
+  avgMoisture = 0;
+  for (int i = 0; i < WINDOW_SIZE; i++) {
+    avgMoisture += moistureReadings[i];
+  }
+  avgMoisture /= WINDOW_SIZE;
+
+  // determine if soil is wet
+  if (avgMoisture > 400) {
+    soilIsWet = true;
+  } else {
+    soilIsWet = false;
+  }
+
+  // serial output
+  Serial.print("Temp: ");
+  Serial.print(temperature);
+  Serial.println(" C");
+
+  Serial.print("Moisture (avg): ");
+  Serial.println(avgMoisture);
+
+  Serial.print("Soil Status: ");
+  if (soilIsWet) {
+    Serial.println("Wet");
+  } else {
+    Serial.println("Not Wet");
+  }
+
+  delay(1000);
 }
 
 void checkBME() {
